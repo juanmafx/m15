@@ -1,7 +1,5 @@
 # m15 1.0.0 Release Notes
 
-Status: prepared, not yet tagged or published.
-
 This is the first versioned release. It turns a 2018 CSV exercise into a tested toolkit for analyzing 15-minute OHLCV bars.
 
 ## Highlights
@@ -23,6 +21,7 @@ uv run m15 csv-example --output eggs.csv
 ## Known limitations
 
 - Timestamps are naive broker time.
+- Resampling produces a bar for partially filled buckets.
 - Range-based volatility estimators read low on discretely sampled data.
 - Simulated data is not a realistic market model.
 - The package is marked as not for upload to PyPI, and the repository declares no license.

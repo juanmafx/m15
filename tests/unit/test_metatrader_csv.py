@@ -1,4 +1,5 @@
 import hashlib
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -6,6 +7,7 @@ import pytest
 
 from m15.data.metatrader_csv import (
     MAX_LINE_BYTES,
+    format_candle,
     format_series,
     parse_line,
     parse_lines,
@@ -90,6 +92,39 @@ def test_read_series_rejects_non_ascii(tmp_path: Path) -> None:
     path.write_bytes(b"2018.03.15,07:15,1,2,0.5,1,\xc3\xa9\n")
     with pytest.raises(CandleFormatError, match="non-ASCII"):
         read_series(path)
+
+
+def test_read_series_rejects_empty_input(tmp_path: Path) -> None:
+    path = tmp_path / "bars.csv"
+    path.write_bytes(b"")
+    with pytest.raises(CandleFormatError, match="no bars"):
+        read_series(path)
+
+
+def test_read_series_reports_widest_price_precision(tmp_path: Path) -> None:
+    path = tmp_path / "bars.csv"
+    path.write_text(
+        "2026.01.05,00:00,1.2,1.23499,1,1.2,10\n2026.01.05,00:15,2,3,1,2,10\n", encoding="ascii"
+    )
+    assert read_series(path).price_decimals == 5
+
+
+@pytest.mark.parametrize(
+    ("line", "decimals"),
+    [
+        ("2026.01.05,00:00,0.001,0.002,0.001,0.001,1", 2),
+        ("2026.01.05,00:00,999999999999,999999999999.9,999999999999,999999999999,1", 0),
+    ],
+)
+def test_format_refuses_prices_the_file_format_cannot_hold(line: str, decimals: int) -> None:
+    with pytest.raises(CandleFormatError, match="does not fit"):
+        format_candle(parse_line(line, 1), decimals)
+
+
+def test_format_refuses_volume_beyond_file_format() -> None:
+    candle = replace(parse_line(LINE, 1), volume=10**15)
+    with pytest.raises(CandleFormatError, match="15-digit"):
+        format_candle(candle)
 
 
 def test_format_round_trip() -> None:

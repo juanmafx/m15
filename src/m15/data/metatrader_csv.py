@@ -22,6 +22,7 @@ _VOLUME = re.compile(r"[0-9]{1,15}")
 class LoadedSeries:
     candles: tuple[Candle, ...]
     sha256: str
+    price_decimals: int
 
 
 def parse_line(line: str, line_number: int) -> Candle:
@@ -53,6 +54,13 @@ def parse_lines(lines: Iterable[str]) -> tuple[Candle, ...]:
     return tuple(candles)
 
 
+def _price_decimals(lines: Iterable[str]) -> int:
+    return max(
+        (len(text.partition(".")[2]) for line in lines for text in line.split(",")[2:6]),
+        default=0,
+    )
+
+
 def read_series(path: Path, max_file_bytes: int = MAX_FILE_BYTES) -> LoadedSeries:
     if not path.is_file():
         raise CandleFormatError("input must be a regular file")
@@ -71,14 +79,26 @@ def read_series(path: Path, max_file_bytes: int = MAX_FILE_BYTES) -> LoadedSerie
                 lines.append(raw_line.decode("ascii"))
             except UnicodeDecodeError as error:
                 raise CandleFormatError(f"line {len(lines) + 1}: non-ASCII data") from error
-    return LoadedSeries(parse_lines(lines), digest.hexdigest())
+    candles = parse_lines(lines)
+    if not candles:
+        raise CandleFormatError("input contains no bars")
+    return LoadedSeries(candles, digest.hexdigest(), _price_decimals(lines))
+
+
+def _format_price(price: float, price_decimals: int) -> str:
+    text = f"{price:.{price_decimals}f}"
+    if not _PRICE.fullmatch(text) or float(text) <= 0:
+        raise CandleFormatError(f"price {price} does not fit {price_decimals} decimals")
+    return text
 
 
 def format_candle(candle: Candle, price_decimals: int = 2) -> str:
     prices = ",".join(
-        f"{price:.{price_decimals}f}"
+        _format_price(price, price_decimals)
         for price in (candle.open, candle.high, candle.low, candle.close)
     )
+    if not _VOLUME.fullmatch(str(candle.volume)):
+        raise CandleFormatError("volume exceeds the 15-digit file format")
     stamp = candle.opened_at.strftime("%Y.%m.%d,%H:%M")
     return f"{stamp},{prices},{candle.volume}"
 

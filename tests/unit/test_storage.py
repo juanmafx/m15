@@ -51,6 +51,11 @@ def test_schema_enforces_ohlc_constraints(tmp_path: Path) -> None:
             )
 
 
+def test_connection_distrusts_schema_functions(tmp_path: Path) -> None:
+    with closing(connect(tmp_path / "m15.sqlite3")) as connection:
+        assert connection.execute("PRAGMA trusted_schema").fetchone() == (0,)
+
+
 def test_schema_enforces_foreign_keys(tmp_path: Path) -> None:
     with (
         closing(connect(tmp_path / "m15.sqlite3")) as connection,

@@ -13,6 +13,14 @@ class Gap:
     missing_bars: int
 
 
+def count_irregular_intervals(candles: Sequence[Candle], step: timedelta) -> int:
+    return sum(
+        1
+        for previous, current in itertools.pairwise(candles)
+        if (current.opened_at - previous.opened_at) % step
+    )
+
+
 def find_gaps(candles: Sequence[Candle], step: timedelta) -> list[Gap]:
     if step <= timedelta(0):
         raise ValueError("step must be positive")

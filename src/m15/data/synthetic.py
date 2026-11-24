@@ -7,6 +7,7 @@ from statistics import NormalDist
 from m15.domain.candle import Candle
 
 MINUTES_PER_YEAR = 365 * 24 * 60
+_EPOCH = datetime(1970, 1, 1)
 _STANDARD_NORMAL = NormalDist()
 _SMALLEST_UNIFORM = 2.0**-53
 
@@ -40,6 +41,10 @@ class SimulationConfig:
             raise ValueError("annual_volatility must be non-negative")
         if self.timeframe_minutes <= 0:
             raise ValueError("timeframe_minutes must be positive")
+        if self.start.tzinfo is not None:
+            raise ValueError("start must be a naive timestamp")
+        if (self.start - _EPOCH) % timedelta(minutes=self.timeframe_minutes):
+            raise ValueError("start must be aligned to the timeframe")
         if self.substeps <= 0:
             raise ValueError("substeps must be positive")
         if self.mean_volume <= 0:

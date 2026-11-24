@@ -10,15 +10,15 @@ Intraday price files are easy to misread: exports contain weekend gaps, malforme
 
 ## Why this project exists
 
-The 2018 repository held one script and a data file. The script was the `csv.writer` example from the Python documentation and no longer ran on Python 3. The question the data invited, what can be measured reliably from M15 bars, was never answered. This version answers it with correct estimators, explicit assumptions, and tests that check the mathematics.
+The 2018 repository held one script, its sample output, and a data file. The script was the `csv.writer` example from the Python documentation and fails on Python 3. This version builds what the data file suggested: measuring M15 bars with published estimators, explicit assumptions, and tests that check the mathematics.
 
 ## What it does
 
 - Parses the headerless MetaTrader-style format `YYYY.MM.DD,HH:MM,open,high,low,close,volume` under strict validation.
-- Detects gaps and excludes returns that span them.
+- Detects gaps and excludes returns that span them, and counts intervals that do not fit the expected bar spacing.
 - Computes close-to-close, Parkinson, Garman-Klass, and Rogers-Satchell volatility.
 - Computes maximum drawdown and rolling mean, deviation, minimum, and maximum in linear time.
-- Resamples to any larger timeframe.
+- Resamples to any whole multiple of the source timeframe, keeping the input's price precision.
 - Simulates seeded geometric Brownian motion bars for reproducible experiments.
 - Optionally stores candles and analysis runs in SQLite.
 
@@ -61,7 +61,7 @@ uv run m15 analyze synthetic.csv --database runs.sqlite3 --symbol SYNTH
 uv run m15 csv-example --output eggs.csv
 ```
 
-Output files are never overwritten unless `--force` is passed. Errors print to standard error and exit with status 2.
+Output files are never overwritten unless `--force` is passed; `csv-example` has no such flag and always refuses. Files are created with owner-only permissions (`0600`). Errors print to standard error and exit with status 2.
 
 ## Configuration
 
@@ -74,14 +74,16 @@ There are no environment variables or configuration files. All behavior is set b
 | `--annual-drift` | `simulate` | `0.05` | Annual drift of the process |
 | `--annual-volatility` | `simulate` | `0.60` | Annual volatility of the process |
 | `--initial-price` | `simulate` | `100` | First open |
-| `--start` | `simulate` | `2026-01-01` | First bar timestamp |
+| `--start` | `simulate` | `2026-01-01` | First bar timestamp, aligned to 15 minutes |
+| `--price-decimals` | `simulate` | `2` | Decimals written, from 0 to 10 |
 | `--window` | `analyze` | `96` | Rolling window in bars (one day of M15) |
 | `--timeframe-minutes` | `analyze` | `15` | Expected bar spacing |
 | `--database` | `analyze` | none | SQLite file for persistence |
-| `--symbol` | `analyze` | `BTCUSD` | Instrument label stored with the run |
-| `--minutes` | `resample` | required | Target timeframe |
+| `--symbol` | `analyze` | none | Instrument label, required with `--database` |
+| `--minutes` | `resample` | required | Target timeframe, a whole multiple of the source |
+| `--timeframe-minutes` | `resample` | `15` | Source bar spacing |
 
-Annualization assumes a market open all year (`365 * 24 * 60 / timeframe` bars). Timestamps are treated as naive because MetaTrader exports use broker server time. The seventh column is read as tick volume; the original export did not label it.
+Annualization assumes a market open all year (`365 * 24 * 60 / timeframe` bars). Timestamps are treated as naive because MetaTrader exports use broker server time. The seventh column is read as tick volume; the original export did not label it. Prices are IEEE 754 doubles, and a price or volume the file format cannot hold is an error rather than a rounded value. A resampled bar is produced for every non-empty bucket, including partially filled ones.
 
 ## Database
 
@@ -106,6 +108,6 @@ The tool takes local files only and makes no network calls. Input is size-limite
 
 ## Attribution and license
 
-- `src/m15/legacy/python_docs_csv.py` and `tests/fixtures/python_docs_eggs.csv` derive from the `csv` module example in the [Python documentation](https://docs.python.org/3/library/csv.html), which is covered by the Python Software Foundation License.
+- `src/m15/legacy/python_docs_csv.py` and `tests/fixtures/python_docs_eggs.csv` derive from the `csv` module example in the [Python documentation](https://docs.python.org/3/library/csv.html). Python's license file states that documentation examples, from Python 3.8.6 onward, are dual licensed under the PSF License Version 2 and the Zero-Clause BSD license.
 - The Parkinson (1980), Garman-Klass (1980), and Rogers-Satchell (1991) estimators are published methods. References are in the architecture document.
 - The repository does not declare a license, so default copyright applies to the original code.

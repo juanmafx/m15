@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from math import exp, isclose, log, sqrt
+from statistics import stdev
 
 import pytest
 
 from m15.analytics.drawdown import max_drawdown
-from m15.analytics.gaps import find_gaps
+from m15.analytics.gaps import count_irregular_intervals, find_gaps
 from m15.analytics.report import build_report
 from m15.analytics.resample import bucket_start, resample
 from m15.analytics.returns import contiguous_log_returns, log_returns
@@ -56,6 +57,15 @@ def test_rolling_moments_known_values() -> None:
 
 def test_rolling_window_of_one() -> None:
     assert [item.std for item in rolling_moments([3.0, 4.0], 1)] == [0.0, 0.0]
+
+
+def test_rolling_moments_recover_after_outlier_leaves_window() -> None:
+    values = [50.0, -50.0, 50.0, -50.0] + [1e-9 * (-1) ** i for i in range(500)]
+    assert rolling_moments(values, 96)[-1].std == pytest.approx(stdev(values[-96:]), rel=1e-9)
+
+
+def test_rolling_moments_shorter_than_window_is_empty() -> None:
+    assert rolling_moments([1.0, 2.0], 3) == []
 
 
 @pytest.mark.parametrize("function", [rolling_moments, rolling_min, rolling_max])
@@ -121,6 +131,23 @@ def test_resample_aggregates_ohlcv() -> None:
     assert (first.open, first.high, first.low, first.close, first.volume) == (10, 15, 9, 14, 20)
 
 
+@pytest.mark.parametrize("minutes", [20, 7, 5])
+def test_resample_rejects_non_multiple_target(minutes: int) -> None:
+    with pytest.raises(ValueError, match="whole multiple"):
+        resample([bar(0, 10, 12, 9, 11)], minutes)
+
+
+def test_resample_rejects_bars_off_the_source_grid() -> None:
+    candle = Candle(START + timedelta(minutes=5), 10, 12, 9, 11, 1)
+    with pytest.raises(ValueError, match="not aligned"):
+        resample([candle], 60)
+
+
+def test_resample_accepts_declared_source_timeframe() -> None:
+    candle = Candle(START + timedelta(minutes=5), 10, 12, 9, 11, 1)
+    assert len(resample([candle], 60, source_minutes=5)) == 1
+
+
 def test_resample_rejects_invalid_minutes() -> None:
     with pytest.raises(ValueError, match="positive"):
         resample([], 0)
@@ -135,6 +162,16 @@ def test_report_structure_and_gap_accounting() -> None:
     assert report["coverage"]["missing_bars"] == 10
     assert report["coverage"]["contiguous_returns"] == 288
     assert all(value > 0 for value in report["annualized_volatility"].values())
+
+
+def test_report_counts_irregular_intervals() -> None:
+    series = [
+        Candle(START + timedelta(minutes=minute), 1, 2, 0.5, 1 + minute / 100, 1)
+        for minute in (0, 5, 15, 30, 45, 60)
+    ]
+    assert count_irregular_intervals(series, STEP) == 2
+    report = build_report(series, "0" * 64, window=2)
+    assert report["coverage"]["irregular_intervals"] == 2
 
 
 @pytest.mark.parametrize(
@@ -159,8 +196,11 @@ def test_report_rejects_invalid_parameters(
         {"substeps": 0},
         {"mean_volume": 0.0},
         {"annual_drift": float("inf")},
+        {"start": datetime(2026, 1, 1, 0, 7)},
+        {"start": datetime(2026, 1, 1, 0, 0, 30)},
+        {"start": datetime(2026, 1, 1, tzinfo=UTC)},
     ],
 )
-def test_simulation_rejects_invalid_configuration(changes: dict[str, float]) -> None:
+def test_simulation_rejects_invalid_configuration(changes: dict[str, object]) -> None:
     with pytest.raises(ValueError, match=r"must be"):
         SimulationConfig(**{"bars": 1, "seed": 1, **changes})

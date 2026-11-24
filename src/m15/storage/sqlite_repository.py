@@ -37,6 +37,7 @@ def schema_sql() -> str:
 
 def connect(database: Path | str) -> sqlite3.Connection:
     connection = sqlite3.connect(database)
+    connection.execute("PRAGMA trusted_schema = OFF")
     connection.execute("PRAGMA foreign_keys = ON")
     connection.executescript(schema_sql())
     return connection

@@ -5,7 +5,7 @@ from typing import Any
 
 from m15 import __version__
 from m15.analytics.drawdown import max_drawdown
-from m15.analytics.gaps import find_gaps
+from m15.analytics.gaps import count_irregular_intervals, find_gaps
 from m15.analytics.returns import contiguous_log_returns
 from m15.analytics.rolling import rolling_max, rolling_min, rolling_moments
 from m15.analytics.volatility import (
@@ -60,6 +60,7 @@ def build_report(
             "last_bar": candles[-1].opened_at.isoformat(),
             "gap_count": len(gaps),
             "missing_bars": sum(gap.missing_bars for gap in gaps),
+            "irregular_intervals": count_irregular_intervals(candles, step),
             "contiguous_returns": len(returns),
         },
         "returns": {

@@ -12,9 +12,16 @@ def bucket_start(moment: datetime, minutes: int) -> datetime:
     return _EPOCH + ((moment - _EPOCH) // width) * width
 
 
-def resample(candles: Sequence[Candle], minutes: int) -> tuple[Candle, ...]:
-    if minutes <= 0:
+def resample(
+    candles: Sequence[Candle], minutes: int, source_minutes: int = 15
+) -> tuple[Candle, ...]:
+    if minutes <= 0 or source_minutes <= 0:
         raise ValueError("minutes must be positive")
+    if minutes % source_minutes:
+        raise ValueError("minutes must be a whole multiple of the source timeframe")
+    source = timedelta(minutes=source_minutes)
+    if any((candle.opened_at - _EPOCH) % source for candle in candles):
+        raise ValueError("bars are not aligned to the source timeframe")
     aggregated: list[Candle] = []
     for start, members in groupby(candles, key=lambda c: bucket_start(c.opened_at, minutes)):
         bucket = tuple(members)

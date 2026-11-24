@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from math import sqrt
 from operator import ge, le
 
+_Moments = tuple[int, float, float]
+
 
 @dataclass(frozen=True, slots=True)
 class WindowMoments:
@@ -16,25 +18,38 @@ def _require_window(window: int) -> None:
         raise ValueError("window must be positive")
 
 
+def _merge(left: _Moments, right: _Moments) -> _Moments:
+    left_count, left_mean, left_scatter = left
+    right_count, right_mean, right_scatter = right
+    count = left_count + right_count
+    delta = right_mean - left_mean
+    return (
+        count,
+        left_mean + delta * right_count / count,
+        left_scatter + right_scatter + delta * delta * left_count * right_count / count,
+    )
+
+
 def rolling_moments(values: Sequence[float], window: int) -> list[WindowMoments]:
     _require_window(window)
     if window == 1:
         return [WindowMoments(value, 0.0) for value in values]
+    if len(values) < window:
+        return []
+    suffixes: list[_Moments] = [(1, value, 0.0) for value in values]
+    for index in range(len(values) - 2, -1, -1):
+        if (index + 1) % window:
+            suffixes[index] = _merge(suffixes[index], suffixes[index + 1])
     results: list[WindowMoments] = []
-    mean = 0.0
-    scatter = 0.0
+    prefix: _Moments = (1, values[0], 0.0)
     for index, value in enumerate(values):
-        if index < window:
-            delta = value - mean
-            mean += delta / (index + 1)
-            scatter += delta * (value - mean)
-        else:
-            leaving = values[index - window]
-            previous_mean = mean
-            mean += (value - leaving) / window
-            scatter += (value - leaving) * (value - mean + leaving - previous_mean)
-        if index >= window - 1:
-            results.append(WindowMoments(mean, sqrt(max(scatter, 0.0) / (window - 1))))
+        single: _Moments = (1, value, 0.0)
+        prefix = single if index % window == 0 else _merge(prefix, single)
+        if index < window - 1:
+            continue
+        start = index - window + 1
+        combined = suffixes[start] if start % window == 0 else _merge(suffixes[start], prefix)
+        results.append(WindowMoments(combined[1], sqrt(combined[2] / (window - 1))))
     return results
 
 

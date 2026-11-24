@@ -2,13 +2,13 @@
 
 This project follows [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] - Unreleased
+## [1.0.0]
 
 ### Added
 
 - Installable `m15` package and command-line interface.
 - Strict parser for MetaTrader-style M15 CSV files with input hashing.
-- Gap detection, gap-aware returns, four volatility estimators, maximum drawdown, rolling statistics, and resampling.
+- Gap detection, gap-aware returns, four volatility estimators, maximum drawdown, rolling statistics, and precision-preserving resampling to whole multiples of the source timeframe.
 - Seeded geometric Brownian motion simulator.
 - Optional SQLite schema and persistence.
 - Unit, property-based, and statistical test suites with a committed test report.
@@ -24,4 +24,5 @@ This project follows [Semantic Versioning](https://semver.org/).
 ### Security
 
 - The exercise no longer writes over a fixed file name in the working directory.
-- Output writes are atomic and refuse to overwrite without `--force`.
+- File output is atomic and refuses to overwrite without `--force`.
+- SQLite connections disable `trusted_schema`, limiting what functions a tampered database schema can call.
