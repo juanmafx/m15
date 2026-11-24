@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "m15"
+version = "1.0.0"
+description = "Reproducible analysis of 15-minute OHLCV market bars using only the Python standard library."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+classifiers = ["Private :: Do Not Upload", "Programming Language :: Python :: 3.13", "Programming Language :: Python :: 3.14", "Typing :: Typed"]
+
+[project.scripts]
+m15 = "m15.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.4", "pytest-cov>=7.0", "hypothesis>=6.140", "ruff>=0.14", "mypy>=1.18", "pip-audit>=2.9"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/m15"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+
+[tool.coverage.run]
+branch = true
+source = ["m15"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "C4", "SIM", "PT", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"tools/**" = ["S314", "S603"]
+"src/m15/data/synthetic.py" = ["S311"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+files = ["src"]
