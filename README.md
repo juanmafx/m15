@@ -1,4 +1,4 @@
-# m15
+# m15-market-bars
 
 A small, dependency-free Python toolkit for validating and analyzing 15-minute (M15) OHLCV market bars, with seeded simulation and statistical tests.
 
